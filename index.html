@@ -544,246 +544,239 @@
       <span>Made by toi, validé par ChatGPT 🧪</span>
     </footer>
   </div>
-
   <script>
-    const API_URL = "https://fastapi-scan.onrender.com/api/scan";
+  const API_URL = "https://fastapi-scan.onrender.com/api/scan";
 
-    const scanBtn = document.getElementById("scanBtn");
-    const scanBtnText = document.getElementById("scanBtnText");
-    const scanBtnIcon = document.getElementById("scanBtnIcon");
-    const lastScanLabel = document.getElementById("lastScanLabel");
-    const autoToggle = document.getElementById("autoToggle");
+  const scanBtn = document.getElementById("scanBtn");
+  const scanBtnText = document.getElementById("scanBtnText");
+  const scanBtnIcon = document.getElementById("scanBtnIcon");
+  const lastScanLabel = document.getElementById("lastScanLabel");
+  const autoToggle = document.getElementById("autoToggle");
 
-    const pingValueEl = document.getElementById("pingValue");
-    const downloadValueEl = document.getElementById("downloadValue");
-    const uploadValueEl = document.getElementById("uploadValue");
+  const pingValueEl = document.getElementById("pingValue");
+  const downloadValueEl = document.getElementById("downloadValue");
+  const uploadValueEl = document.getElementById("uploadValue");
 
-    const pingQualityEl = document.getElementById("pingQuality");
-    const downQualityEl = document.getElementById("downQuality");
-    const upQualityEl = document.getElementById("upQuality");
+  const pingQualityEl = document.getElementById("pingQuality");
+  const downQualityEl = document.getElementById("downQuality");
+  const upQualityEl = document.getElementById("upQuality");
 
-    const pingCommentEl = document.getElementById("pingComment");
-    const downloadCommentEl = document.getElementById("downloadComment");
-    const uploadCommentEl = document.getElementById("uploadComment");
+  const pingCommentEl = document.getElementById("pingComment");
+  const downloadCommentEl = document.getElementById("downloadComment");
+  const uploadCommentEl = document.getElementById("uploadComment");
 
-    const errorBanner = document.getElementById("errorBanner");
-    const errorText = document.getElementById("errorText");
+  const errorBanner = document.getElementById("errorBanner");
+  const errorText = document.getElementById("errorText");
 
-    const historyList = document.getElementById("historyList");
-    const historyCountEl = document.getElementById("historyCount");
+  const historyList = document.getElementById("historyList");
+  const historyCountEl = document.getElementById("historyCount");
 
-    const statusDot = document.getElementById("statusDot");
-    const statusText = document.getElementById("statusText");
+  const statusDot = document.getElementById("statusDot");
+  const statusText = document.getElementById("statusText");
 
-    let isLoading = false;
-    let history = [];
-    let autoInterval = null;
+  let isLoading = false;
+  let history = [];
+  let autoInterval = null;
 
-    function setLoading(state) {
-      isLoading = state;
-      scanBtn.disabled = state;
-      if (state) {
-        scanBtnText.textContent = "Scan en cours…";
-        scanBtnIcon.style.display = "block";
-        statusText.textContent = "Scan en cours…";
-      } else {
-        scanBtnText.textContent = "Lancer un scan";
-        scanBtnIcon.style.display = "none";
-        if (history.length > 0) {
-          statusText.textContent = "Dernier scan OK";
-        } else {
-          statusText.textContent = "En veille";
-        }
-      }
+  function setLoading(state) {
+    isLoading = state;
+    scanBtn.disabled = state;
+    if (state) {
+      scanBtnText.textContent = "Scan en cours…";
+      scanBtnIcon.style.display = "block";
+      statusText.textContent = "Scan en cours…";
+    } else {
+      scanBtnText.textContent = "Lancer un scan";
+      scanBtnIcon.style.display = "none";
+      statusText.textContent = history.length > 0 ? "Dernier scan OK" : "En veille";
+    }
+  }
+
+  function formatTime(date = new Date()) {
+    return date.toLocaleTimeString("fr-FR", {
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+    });
+  }
+
+  function showError(message) {
+    errorText.textContent = message;
+    errorBanner.style.display = "flex";
+    statusDot.classList.add("bad");
+  }
+
+  function clearError() {
+    errorBanner.style.display = "none";
+    statusDot.classList.remove("bad");
+  }
+
+  function getPingQuality(ping) {
+    if (ping == null) return { label: "Inconnu", level: "bad", comment: "Impossible de mesurer le ping." };
+    if (ping <= 30) return { label: "Excellent", level: "good", comment: "Nickel pour le gaming & la visio." };
+    if (ping <= 60) return { label: "Correct", level: "medium", comment: "Léger délai possible." };
+    if (ping <= 120) return { label: "Lent", level: "medium", comment: "Latency visible." };
+    return { label: "Très lent", level: "bad", comment: "Ta 5G est en PLS." };
+  }
+
+  function getDownloadQuality(down) {
+    if (down == null) return { label: "Inconnu", comment: "Impossible de mesurer le download." };
+    if (down >= 50) return { label: "Ultra rapide", comment: "Streaming 4K easy." };
+    if (down >= 20) return { label: "Confortable", comment: "Streaming HD OK." };
+    if (down >= 5) return { label: "Basique", comment: "OK pour YouTube." };
+    return { label: "Faible", comment: "Connexion limitée." };
+  }
+
+  function getUploadQuality(up) {
+    if (up == null) return { label: "Inconnu", comment: "Impossible de mesurer l'upload." };
+    if (up >= 20) return { label: "Nickel", comment: "Top pour stream." };
+    if (up >= 10) return { label: "Correct", comment: "Appels vidéo OK." };
+    if (up >= 3) return { label: "Limite", comment: "Visios possibles mais instables." };
+    return { label: "Faible", comment: "Dur pour envoyer des fichiers ou faire des visios." };
+  }
+
+  function setQualityPill(el, quality) {
+    el.textContent = quality.label;
+    el.style.color = "#e5e7eb";
+    el.style.borderColor = "rgba(55,65,81,0.9)";
+    if (quality.level === "good") {
+      el.style.background = "rgba(22,163,74,0.18)";
+      el.style.borderColor = "rgba(34,197,94,0.8)";
+    } else if (quality.level === "medium") {
+      el.style.background = "rgba(250,204,21,0.14)";
+      el.style.borderColor = "rgba(234,179,8,0.9)";
+    } else if (quality.level === "bad") {
+      el.style.background = "rgba(248,113,113,0.14)";
+      el.style.borderColor = "rgba(239,68,68,0.9)";
+    }
+  }
+
+  function updateHistory(ping, download, upload) {
+    const entry = { time: formatTime(), ping, download, upload };
+    history.unshift(entry);
+    if (history.length > 10) history.pop();
+    renderHistory();
+  }
+
+  function renderHistory() {
+    historyCountEl.textContent = history.length;
+
+    if (history.length === 0) {
+      historyList.innerHTML = '<div class="mini-label">Aucun scan pour le moment.</div>';
+      return;
     }
 
-    function formatTime(date = new Date()) {
-      return date.toLocaleTimeString("fr-FR", {
-        hour: "2-digit",
-        minute: "2-digit",
-        second: "2-digit",
-      });
+    const maxPing = Math.max(...history.map(h => h.ping || 0), 1);
+    const maxDown = Math.max(...history.map(h => h.download || 0), 1);
+    const maxUp = Math.max(...history.map(h => h.upload || 0), 1);
+
+    historyList.innerHTML = "";
+
+    history.forEach(h => {
+      const item = document.createElement("div");
+      item.className = "history-item";
+
+      const timeEl = document.createElement("div");
+      timeEl.className = "history-time";
+      timeEl.textContent = h.time;
+
+      const bars = document.createElement("div");
+      bars.className = "history-bars";
+
+      const barPing = document.createElement("div");
+      const barPingFill = document.createElement("div");
+      barPing.className = "bar";
+      barPingFill.className = "bar-fill ping";
+      barPingFill.style.width = ((h.ping || 0) / maxPing) * 100 + "%";
+      barPing.appendChild(barPingFill);
+
+      const barDown = document.createElement("div");
+      const barDownFill = document.createElement("div");
+      barDown.className = "bar";
+      barDownFill.className = "bar-fill download";
+      barDownFill.style.width = ((h.download || 0) / maxDown) * 100 + "%";
+      barDown.appendChild(barDownFill);
+
+      const barUp = document.createElement("div");
+      const barUpFill = document.createElement("div");
+      barUp.className = "bar";
+      barUpFill.className = "bar-fill upload";
+      barUpFill.style.width = ((h.upload || 0) / maxUp) * 100 + "%";
+      barUp.appendChild(barUpFill);
+
+      bars.appendChild(barPing);
+      bars.appendChild(barDown);
+      bars.appendChild(barUp);
+
+      const values = document.createElement("div");
+      values.className = "history-values";
+      values.innerHTML = `
+        <div>${h.ping != null ? h.ping.toFixed(0) + " ms" : "–"}</div>
+        <div>${h.download != null ? h.download.toFixed(1) + " ↓" : "–"}</div>
+        <div>${h.upload != null ? h.upload.toFixed(1) + " ↑" : "–"}</div>
+      `;
+
+      item.appendChild(timeEl);
+      item.appendChild(bars);
+      item.appendChild(values);
+      historyList.appendChild(item);
+    });
+  }
+
+  async function runScan() {
+    if (isLoading) return;
+    clearError();
+    setLoading(true);
+
+    try {
+      const res = await fetch(API_URL, { cache: "no-store" });
+
+      if (!res.ok) throw new Error("API a répondu " + res.status);
+
+      const data = await res.json();
+
+      const ping = typeof data.ping === "number" ? data.ping : null;
+      const download = typeof data.download === "number" ? data.download : null;
+      const upload = typeof data.upload === "number" ? data.upload : null;
+
+      pingValueEl.textContent = ping != null ? ping : "–";
+      downloadValueEl.textContent = download != null ? download.toFixed(1) : "–";
+      uploadValueEl.textContent = upload != null ? upload.toFixed(1) : "–";
+
+      const pingQ = getPingQuality(ping);
+      const downQ = getDownloadQuality(download);
+      const upQ = getUploadQuality(upload);
+
+      setQualityPill(pingQualityEl, pingQ);
+      setQualityPill(downQualityEl, { label: downQ.label, level: download >= 20 ? "good" : download >= 5 ? "medium" : "bad" });
+      setQualityPill(upQualityEl, { label: upQ.label, level: upload >= 10 ? "good" : upload >= 3 ? "medium" : "bad" });
+
+      pingCommentEl.textContent = pingQ.comment;
+      downloadCommentEl.textContent = downQ.comment;
+      uploadCommentEl.textContent = upQ.comment;
+
+      lastScanLabel.textContent = formatTime();
+      statusDot.classList.add("good");
+
+      updateHistory(ping, download, upload);
+
+    } catch (err) {
+      console.error(err);
+      showError("Impossible de contacter l’API.");
+    } finally {
+      setLoading(false);
     }
+  }
 
-    function showError(message) {
-      errorText.textContent = message;
-      errorBanner.style.display = "flex";
-      statusDot.classList.add("bad");
+  scanBtn.addEventListener("click", runScan);
+
+  autoToggle.addEventListener("change", () => {
+    if (autoToggle.checked) {
+      autoInterval = setInterval(runScan, 10000);
+    } else {
+      clearInterval(autoInterval);
     }
-
-    function clearError() {
-      errorBanner.style.display = "none";
-      statusDot.classList.remove("bad");
-    }
-
-    function getPingQuality(ping) {
-      if (ping == null) return { label: "Inconnu", level: "bad", comment: "Impossible de mesurer le ping." };
-      if (ping <= 30) return { label: "Excellent", level: "good", comment: "Nickel pour le gaming & la visio." };
-      if (ping <= 60) return { label: "Correct", level: "medium", comment: "Utilisable, mais tu peux sentir un léger délai." };
-      if (ping <= 120) return { label: "Lent", level: "medium", comment: "Latency visible en jeu / appel." };
-      return { label: "Très lent", level: "bad", comment: "Ta 5G est en PLS, clairement." };
-    }
-
-    function getDownloadQuality(down) {
-      if (down == null) return { label: "Inconnu", comment: "Impossible de mesurer le download." };
-      if (down >= 50) return { label: "Ultra rapide", comment: "Streaming 4K + gros téléchargements easy." };
-      if (down >= 20) return { label: "Confortable", comment: "Streaming HD / visio sans soucis." };
-      if (down >= 5) return { label: "Basique", comment: "OK pour YouTube mais pas de gros téléchargements." };
-      return { label: "Faible", comment: "Connexion très limitée, même le scroll peut souffrir." };
-    }
-
-    function getUploadQuality(up) {
-      if (up == null) return { label: "Inconnu", comment: "Impossible de mesurer l'upload." };
-      if (up >= 20) return { label: "Nickel", comment: "Top pour stream / upload fichiers lourds." };
-      if (up >= 10) return { label: "Correct", comment: "OK pour appels vidéo & partage de fichiers." };
-      if (up >= 3) return { label: "Limite", comment: "Visios possibles mais pas ultra stables." };
-      return { label: "Faible", comment: "Dur pour envoyer des fichiers ou faire des visios." };
-    }
-
-    function setQualityPill(el, quality) {
-      el.textContent = quality.label;
-      el.style.color = "#e5e7eb";
-      el.style.borderColor = "rgba(55,65,81,0.9)";
-      if (quality.level === "good") {
-        el.style.background = "rgba(22,163,74,0.18)";
-        el.style.borderColor = "rgba(34,197,94,0.8)";
-      } else if (quality.level === "medium") {
-        el.style.background = "rgba(250,204,21,0.14)";
-        el.style.borderColor = "rgba(234,179,8,0.9)";
-      } else if (quality.level === "bad") {
-        el.style.background = "rgba(248,113,113,0.14)";
-        el.style.borderColor = "rgba(239,68,68,0.9)";
-      }
-    }
-
-    function updateHistory(ping, download, upload) {
-      const entry = {
-        time: formatTime(),
-        ping,
-        download,
-        upload,
-      };
-      history.unshift(entry);
-      if (history.length > 10) history.pop();
-      renderHistory();
-    }
-
-    function renderHistory() {
-      historyCountEl.textContent = history.length;
-
-      if (history.length === 0) {
-        historyList.innerHTML =
-          '<div class="mini-label">Aucun scan pour le moment.</div>';
-        return;
-      }
-
-      const maxPing = Math.max(...history.map((h) => h.ping || 0), 1);
-      const maxDown = Math.max(...history.map((h) => h.download || 0), 1);
-      const maxUp = Math.max(...history.map((h) => h.upload || 0), 1);
-
-      historyList.innerHTML = "";
-
-      history.forEach((h) => {
-        const item = document.createElement("div");
-        item.className = "history-item";
-
-        const timeEl = document.createElement("div");
-        timeEl.className = "history-time";
-        timeEl.textContent = h.time;
-
-        const bars = document.createElement("div");
-        bars.className = "history-bars";
-
-        const barPing = document.createElement("div");
-        barPing.className = "bar";
-        const barPingFill = document.createElement("div");
-        barPingFill.className = "bar-fill ping";
-        barPingFill.style.width =
-          ((h.ping || 0) / maxPing) * 100 + "%";
-        barPing.appendChild(barPingFill);
-
-        const barDown = document.createElement("div");
-        barDown.className = "bar";
-        const barDownFill = document.createElement("div");
-        barDownFill.className = "bar-fill download";
-        barDownFill.style.width =
-          ((h.download || 0) / maxDown) * 100 + "%";
-        barDown.appendChild(barDownFill);
-
-        const barUp = document.createElement("div");
-        barUp.className = "bar";
-        const barUpFill = document.createElement("div");
-        barUpFill.className = "bar-fill upload";
-        barUpFill.style.width =
-          ((h.upload || 0) / maxUp) * 100 + "%";
-        barUp.appendChild(barUpFill);
-
-        bars.appendChild(barPing);
-        bars.appendChild(barDown);
-        bars.appendChild(barUp);
-
-        const values = document.createElement("div");
-        values.className = "history-values";
-        values.innerHTML = `
-          <div>${h.ping != null ? h.ping.toFixed(0) + " ms" : "–"}</div>
-          <div>${h.download != null ? h.download.toFixed(1) + " ↓" : "–"}</div>
-          <div>${h.upload != null ? h.upload.toFixed(1) + " ↑" : "–"}</div>
-        `;
-
-        item.appendChild(timeEl);
-        item.appendChild(bars);
-        item.appendChild(values);
-
-        historyList.appendChild(item);
-      });
-    }
-
-    async function runScan() {
-      if (isLoading) return;
-      clearError();
-      setLoading(true);
-
-      try {
-        const res = await fetch(API_URL, { cache: "no-store" });
-
-        if (!res.ok) {
-          throw new Error("API a répondu " + res.status);
-        }
-
-        const data = await res.json();
-
-        const ping = typeof data.ping === "number" ? data.ping : null;
-        const download =
-          typeof data.download === "number" ? data.download : null;
-        const upload =
-          typeof data.upload === "number" ? data.upload : null;
-
-        pingValueEl.textContent = ping != null ? ping.toFixed(0) : "–";
-        downloadValueEl.textContent =
-          download != null ? download.toFixed(2) : "–";
-        uploadValueEl.textContent =
-          upload != null ? upload.toFixed(2) : "–";
-
-        const pingQ = getPingQuality(ping);
-        const downQ = getDownloadQuality(download);
-        const upQ = getUploadQuality(upload);
-
-        setQualityPill(pingQualityEl, pingQ);
-        setQualityPill(downQualityEl, {
-          label: downQ.label,
-          level: download != null && download >= 20 ? "good" : download != null && download >= 5 ? "medium" : "bad",
-        });
-        setQualityPill(upQualityEl, {
-          label: upQ.label,
-          level: upload != null && upload >= 10 ? "good" : upload != null && upload >= 3 ? "medium" : "bad",
-        });
-
-        pingCommentEl.textContent = pingQ.comment;
-        downloadCommentEl.textContent = downQ.comment;
-        uploadCommentEl.textContent = upQ.comment;
-
-        lastScanLabel.textContent = formatTime();
-        statusDot.classList.remove("bad");
-        statusDot.classList.add("good");
-
-        update
+  });
+</script>
+</body>
+</html>
